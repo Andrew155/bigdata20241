@@ -1,5 +1,5 @@
 # COVID-19 Data Pipeline Project
-
+<img src="https://scontent.fhan2-3.fna.fbcdn.net/v/t1.15752-9/462571607_979947827484140_4826484144837939755_n.png?_nc_cat=111&ccb=1-7&_nc_sid=9f807c&_nc_ohc=V0OrYMqnRvcQ7kNvgEFlCav&_nc_oc=AdhaMiS-XNnKDdXKtN86_KFQYUa-Hicr_EFc3SE1jBtw0cr7-CVkq-EDZmF1u--G_rq0bghYqczGCYFGR-AljzR3&_nc_zt=23&_nc_ht=scontent.fhan2-3.fna&oh=03_Q7cD1QEaVUB_MHYlQpNl3Ze9TE_Bd912DzpScKb8U1BZfkQF9A&oe=67892D33" width="800" alt="Project Architecture"/>
 ## Overview
 This project is designed to store and process COVID-19 data using various big data technologies like Kafka, Spark, Hive, and Superset, with the goal of creating a scalable data pipeline for COVID-19-related information. The pipeline includes several stages: data ingestion via Kafka, data transformation with Spark, storage in HDFS, and visualization using Superset.
 
