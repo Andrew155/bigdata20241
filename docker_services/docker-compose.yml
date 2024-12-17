@@ -1,0 +1,414 @@
+version: "3"
+
+x-airflow-common:
+  &airflow-common
+  image: ${AIRFLOW_IMAGE_NAME:-pavansrivathsa/airflow:latest}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
+    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+    AIRFLOW__WEBSERVER__ENABLE_CSRF: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'a-very-secret-key'
+    AIRFLOW__WEBSERVER__WTF_CSRF_ENABLED: 'true'
+    AIRFLOW__WEBSERVER__WTF_CSRF_TIME_LIMIT: '3600'
+    AIRFLOW__WEBSERVER__COOKIE_SECURE: 'false'
+    AIRFLOW__WEBSERVER__SESSION_LIFETIME_DAYS: '30'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+    AIRFLOW__SMTP__SMTP_PORT: 587
+    AIRFLOW__SMTP__SMTP_USER: nguyenlongnhatt155@gmail.com
+    AIRFLOW__SMTP__SMTP_PASSWORD: mebv lpcu kxfc wxmd
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: nguyenlongnhatt155@gmail.com
+    AIRFLOW__SMTP__SMTP_SSL: 'false'
+    AIRFLOW__SMTP__SMTP_STARTTLS: 'true'
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy 
+  networks:
+      - app-tier
+networks:
+    app-tier:
+      driver: bridge
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: hdp_namenode
+    restart: always
+    ports:
+      - 9870:9870
+      - 9010:9000
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+      - hadoop_conf:/opt/hadoop-3.2.1/etc/hadoop/
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - ./hadoop.env
+    networks:
+      - app-tier
+  
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: hdp_datanode
+    restart: always
+    volumes:
+      - hadoop_datanode_1:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    ports:
+      - "9864:9864"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - app-tier
+  datanode_2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: hdp_datanode_2
+    restart: always
+    volumes:
+      - hadoop_datanode_2:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    ports:
+      - "9865:9864"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - app-tier
+  datanode_3:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: hdp_datanode_3
+    restart: always
+    volumes:
+      - hadoop_datanode_3:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+    ports:
+      - "9866:9864"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - app-tier
+
+  # resourcemanager:
+  #   image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+  #   container_name: hdp_resourcemanager
+  #   restart: always
+  #   environment:
+  #     SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode_2:9864 datanode_3:9864"
+  #   env_file:
+  #     - ./hadoop.env
+  #   networks:
+  #     - app-tier
+
+  # nodemanager1:
+  #   image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+  #   container_name: hdp_nodemanager
+  #   restart: always
+  #   environment:
+  #     SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode_2:9864 datanode_3:9864 resourcemanager:8088"
+  #   env_file:
+  #     - ./hadoop.env
+  #   networks:
+  #     - app-tier
+
+  # historyserver:
+  #   image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+  #   container_name: hdp_historyserver
+  #   restart: always
+  #   environment:
+  #     SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 datanode_2:9864 datanode_3:9864 resourcemanager:8088"
+  #   volumes:
+  #     - hadoop_historyserver:/hadoop/yarn/timeline
+  #   env_file:
+  #     - ./hadoop.env
+  #   networks:
+  #     - app-tier
+
+  spark-master:
+    image: bde2020/spark-master:3.0.0-hadoop3.2
+    container_name: hdp_spark-master
+    depends_on:
+      - namenode
+      - datanode
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - spark_home:/spark
+      - ../../libs/postgresql-42.7.4.jar:/spark/jars/postgresql-42.7.4.jar
+    networks:
+      - app-tier
+
+  spark-worker-1:
+    image: bde2020/spark-worker:3.0.0-hadoop3.2
+    container_name: hdp_spark-worker-1
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ../../libs/postgresql-42.7.4.jar:/spark/jars/postgresql-42.7.4.jar
+    networks:
+      - app-tier
+  hive-server:
+    hostname: hiveserver
+    image: bde2020/hive:2.3.2-postgresql-metastore    
+    container_name: hdp_hive-server
+    depends_on:
+      - namenode
+      - datanode
+    env_file:
+      - ./hadoop-hive.env
+    networks:
+      - app-tier
+    environment:
+      HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore/metastore"
+      SERVICE_PRECONDITION: "hive-metastore:9083"
+    volumes:
+      - ../../libs/postgresql-42.7.4.jar:/opt/hive/lib/postgresql-42.7.4.jar
+    ports:
+      - "10000:10000"
+
+  hive-metastore:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hdp_hive-metastore
+    env_file:
+      - ./hadoop-hive.env
+    command: /opt/hive/bin/hive --service metastore
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864 hive-metastore-postgresql:5432"
+    ports:
+      - "9083:9083"
+    networks:
+      - app-tier
+
+  hive-metastore-postgresql:
+    image: bde2020/hive-metastore-postgresql:2.3.0
+    container_name: hdp_hive-metastore-postgresql
+    networks:
+      - app-tier
+
+  # presto-coordinator:
+  #   image: shawnzhu/prestodb:0.181
+  #   container_name: hdp_presto-coordinator
+  #   ports:
+  #     - "8089:8089"
+  #   networks:
+  #     - app-tier
+  
+  zookeeper:
+    hostname: zookeeper
+    container_name: hdp_zookeeper
+    image: 'bitnami/zookeeper'
+    ports:
+      - 2181:2181
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - app-tier
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  kafka:
+    container_name: hdp_kafka
+    image: wurstmeister/kafka:2.12-2.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 60000
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 60000
+    networks:
+      - app-tier
+  nifi:
+    hostname: NiFi
+    container_name: hdp_nifi
+    image: pavansrivathsa/nifi
+    ports:
+      - 2080:2080
+    environment:
+      - NIFI_WEB_HTTP_PORT=2080
+      - NIFI_CLUSTER_IS_NODE=true
+      - NIFI_CLUSTER_NODE_PROTOCOL_PORT=2084
+      - NIFI_ZK_CONNECT_STRING=zookeeper:2181
+      - NIFI_ELECTION_MAX_WAIT=1 min
+      - HADOOP_CONF_DIR=/opt/hadoop-3.2.1/etc/hadoop
+      - NIFI_HADOOP_WORKING_DIR=/tmp/nifi-hadoop-working
+    volumes:
+      - hadoop_conf:/opt/hadoop-3.2.1/etc/hadoop/
+      - nifi_hadoop_working:/tmp/nifi-hadoop-working
+    networks:
+      - app-tier
+    depends_on:
+      - kafka
+      - zookeeper
+      - namenode 
+  jupyterlab:
+    image: pavansrivathsa/jupyterlab
+    container_name: hdp_jupyterlab
+    ports:
+      - 4888:4888
+      - 4040:4040
+      - 8050:8050
+      - 8998:8998
+    volumes:
+      - shared-workspace:/opt/workspace
+      - hadoop_conf:/opt/hadoop-3.2.1/etc/hadoop/
+      - spark_home:/spark
+    networks:
+      - app-tier
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+    networks:
+      - app-tier
+    
+
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    restart: always
+    networks:
+      - app-tier
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - 6080:8080
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:6080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+  flower:
+    <<: *airflow-common
+    command: celery flower
+    ports:
+      - 5555:5555
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+  
+  superset:
+    #image: apache/superset:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_ENV: production
+      SUPERSET_DATABASE_URL: "sqlite:////var/lib/superset/superset.db"
+      SUPERSET_SECRET_KEY: "thisisaverysecuresecretkey"
+    volumes:
+      - superset_home:/var/lib/superset
+    depends_on:
+      - hive-server
+    restart: always
+    networks:
+      - app-tier
+    
+
+volumes:
+  hadoop_namenode:
+  hadoop_datanode_1:
+  hadoop_datanode_2:
+  hadoop_datanode_3:
+  nifi_hadoop_working:
+  hadoop_historyserver:
+  shared-workspace:
+  postgres-db-volume:
+  hadoop_conf:
+  spark_home:
+  superset_home:
