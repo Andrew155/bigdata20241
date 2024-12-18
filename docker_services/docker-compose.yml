@@ -22,9 +22,9 @@ x-airflow-common:
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
     AIRFLOW__SMTP__SMTP_PORT: 587
-    AIRFLOW__SMTP__SMTP_USER: nguyenlongnhatt155@gmail.com
+    AIRFLOW__SMTP__SMTP_USER: abc@gmail.com
     AIRFLOW__SMTP__SMTP_PASSWORD: yourpasswordappgoogle
-    AIRFLOW__SMTP__SMTP_MAIL_FROM: nguyenlongnhatt155@gmail.com
+    AIRFLOW__SMTP__SMTP_MAIL_FROM: abc@gmail.com
     AIRFLOW__SMTP__SMTP_SSL: 'false'
     AIRFLOW__SMTP__SMTP_STARTTLS: 'true'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
